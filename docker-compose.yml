@@ -1,0 +1,58 @@
+services:
+  registry-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      scylla:
+        condition: service_healthy
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8080
+      SCYLLA_CONTACT_POINTS: scylla
+      SCYLLA_LOCAL_DC: datacenter1
+      SCYLLA_KEYSPACE: nmos_registry
+      SCYLLA_REPLICATION_FACTOR: 1
+      HEARTBEAT_GC_INTERVAL_SECONDS: ${HEARTBEAT_GC_INTERVAL_SECONDS:-60}
+      # Must be reachable from clients outside Docker.
+      # Set EXTERNAL_HOST when running `docker compose`, e.g. EXTERNAL_HOST=192.168.1.10
+      PUBLIC_WS_BASE: ws://${EXTERNAL_HOST:-127.0.0.1}:8080
+    ports:
+      - "8080:8080"
+
+  registry-2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      scylla:
+        condition: service_healthy
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8080
+      SCYLLA_CONTACT_POINTS: scylla
+      SCYLLA_LOCAL_DC: datacenter1
+      SCYLLA_KEYSPACE: nmos_registry
+      SCYLLA_REPLICATION_FACTOR: 1
+      HEARTBEAT_GC_INTERVAL_SECONDS: ${HEARTBEAT_GC_INTERVAL_SECONDS:-60}
+      # Externally this service is published on 8081 (to container :8080).
+      PUBLIC_WS_BASE: ws://${EXTERNAL_HOST:-127.0.0.1}:8081
+    ports:
+      - "8081:8080"
+
+  scylla:
+    image: scylladb/scylla:6.2
+    command: --smp 1 --memory 750M --overprovisioned 1 --api-address 0.0.0.0
+    healthcheck:
+      test: ["CMD-SHELL", "nodetool status >/dev/null 2>&1 && nodetool status | grep -q '^UN'"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+    ports:
+      - "9042:9042"
+    volumes:
+      - scylla-data:/var/lib/scylla
+
+volumes:
+  scylla-data: {}
