@@ -16,7 +16,7 @@ This matches IS-04’s guidance that several Registration or Query API instances
 
 - **Fastify** for HTTP performance and clear plugin boundaries.
 - **`@fastify/websocket`** for subscription transports.
-- **TypeScript**, **ESM**, **Node 20+**.
+- **TypeScript**, **ESM**, **Node 22+**.
 
 ---
 
@@ -58,7 +58,7 @@ flowchart LR
 
 ### Prerequisites
 
-- **Node.js 20+**
+- **Node.js 22+**
 - **ScyllaDB** (or Cassandra) reachable on the CQL port (default **9042**)
 
 ### Install and compile
