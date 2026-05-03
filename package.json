@@ -16,7 +16,7 @@
     "node": ">=22"
   },
   "dependencies": {
-    "@fastify/cors": "^10.0.2",
+    "@fastify/cors": "^11.2.0",
     "@fastify/websocket": "^11.0.2",
     "@types/winston": "^2.4.4",
     "cassandra-driver": "^4.7.2",
