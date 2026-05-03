@@ -1,5 +1,7 @@
 # nmos-scripty-registry
 
+[![Unit Tests](https://github.com/cristian-recoseanu/nmos-scripty-registry/actions/workflows/unit_tests.yml/badge.svg)](https://github.com/cristian-recoseanu/nmos-scripty-registry/actions/workflows/unit_tests.yml)
+
 An [NMOS IS-04](https://specs.amwa.tv/is-04/) Discovery and Registration registry: **Registration API** and **Query API**. Persistence targets **[ScyllaDB](https://www.scylladb.com/)** via the Cassandra protocol (`cassandra-driver`). DNS-SD / mDNS are out of scope for this codebase.
 
 ---
