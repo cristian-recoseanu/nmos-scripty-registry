@@ -5,7 +5,7 @@
  * It handles all database operations for resources, change log, health records, and subscriptions.
  */
 import cassandra from "cassandra-driver";
-import { taiFromDate } from "../tai.js";
+import { compareTai, taiFromDate, taiNow } from "../tai.js";
 import type {
   ChangeEventRow,
   RegistryPort,
@@ -56,7 +56,7 @@ const DELETE_PERSISTED_SUB = `DELETE FROM persisted_subscriptions WHERE id = ?`;
 const SELECT_ALL_PERSISTED_SUBS = `SELECT id, json FROM persisted_subscriptions`;
 
 const SELECT_STALE_NODES = `SELECT node_id, updated_tai FROM node_health`;
-const SELECT_ALL_NODES = `SELECT id FROM resources WHERE resource_type = 'nodes'`;
+const SELECT_ALL_NODES = `SELECT id, updated_tai FROM resources WHERE resource_type = 'nodes'`;
 const DELETE_NODE_HEALTH = `DELETE FROM node_health WHERE node_id = ?`;
 
 /**
@@ -120,8 +120,8 @@ export class ScyllaRegistryStore implements RegistryPort {
     id: cassandra.types.Uuid,
     apiVersion: string,
     json: string,
-  ): Promise<boolean> {
-    const now = taiFromDate();
+  ): Promise<{ created: boolean; updated_tai: string }> {
+    const now = taiNow();
     const prev = await this.getResource(type, id);
     const createdTai = prev?.created_tai ?? now;
     const isCreate = !prev;
@@ -150,7 +150,7 @@ export class ScyllaRegistryStore implements RegistryPort {
       id: id.toString(),
       action: isCreate ? "create" : "update",
     });
-    return isCreate;
+    return { created: isCreate, updated_tai: now };
   }
 
   /**
@@ -313,9 +313,13 @@ export class ScyllaRegistryStore implements RegistryPort {
       const healthRecord = nodesWithHealth.get(nodeIdStr);
 
       if (!healthRecord) {
-        // Node exists in resources but has no health record - treat as stale
-        staleNodes.push({ id: nodeId, updated_tai: "" });
-      } else if (healthRecord.updated_tai < cutoffTai) {
+        // Node has no health record: use its registration time as the baseline.
+        // Only stale if it was registered before the cutoff.
+        const nodeUpdatedTai: string = row.get("updated_tai");
+        if (compareTai(nodeUpdatedTai, cutoffTai) <= 0) {
+          staleNodes.push({ id: nodeId, updated_tai: nodeUpdatedTai });
+        }
+      } else if (compareTai(healthRecord.updated_tai, cutoffTai) <= 0) {
         // Node has stale health record
         staleNodes.push(healthRecord);
       }

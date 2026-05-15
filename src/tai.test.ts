@@ -24,7 +24,7 @@ describe("tai", () => {
     const s = taiFromDate(new Date(1_700_000_000_123));
     expect(s).toMatch(/^[0-9]+:[0-9]+$/);
     const [sec, ns] = s.split(":").map(Number);
-    expect(sec).toBe(1_700_000_000);
+    expect(sec).toBe(1_700_000_037); // TAI = UTC + 37 leap seconds
     expect(ns).toBe(123_000_000);
   });
 });

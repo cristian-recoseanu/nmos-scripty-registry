@@ -20,14 +20,14 @@ describe("InMemoryRegistryStore", () => {
   it("upsert creates then updates and records change_log", async () => {
     const store = new InMemoryRegistryStore();
     const nid = id();
-    const created = await store.upsertResource(
+    const { created } = await store.upsertResource(
       "nodes",
       nid,
       "v1.3",
       `{"id":"${nid}"}`,
     );
     expect(created).toBe(true);
-    const updated = await store.upsertResource(
+    const { created: updated } = await store.upsertResource(
       "nodes",
       nid,
       "v1.3",

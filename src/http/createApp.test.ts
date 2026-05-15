@@ -33,6 +33,42 @@ function testConfig(): RegistryConfig {
   };
 }
 
+type SeededResource = {
+  id: cassandra.types.Uuid;
+  api_version: string;
+  json: string;
+  created_tai: string;
+  updated_tai: string;
+};
+
+function seedNodeAtTai(
+  store: InMemoryRegistryStore,
+  id: cassandra.types.Uuid,
+  tai: string,
+  extra: Record<string, unknown> = {},
+) {
+  (
+    store as unknown as { resources: Map<string, SeededResource> }
+  ).resources.set(`nodes:${id.toString()}`, {
+    id,
+    api_version: "v1.3",
+    json: JSON.stringify({
+      id: id.toString(),
+      label: `node-${tai}`,
+      version: tai,
+      ...extra,
+    }),
+    created_tai: tai,
+    updated_tai: tai,
+  });
+}
+
+function linkForRel(linkHeader: string | string[] | undefined, rel: string) {
+  const value = Array.isArray(linkHeader) ? linkHeader.join(", ") : linkHeader;
+  const match = value?.match(new RegExp(`<([^>]+)>; rel="${rel}"`));
+  return match?.[1];
+}
+
 describe("createApp", () => {
   /**
    * Tests that the x-nmos browse routes return correct path segments.
@@ -113,6 +149,122 @@ describe("createApp", () => {
     expect(
       body.some((n) => n.id === nid && n.label === "integration-node"),
     ).toBe(true);
+    await app.close();
+  });
+
+  /**
+   * Tests collection pagination headers and cursors at the HTTP route level.
+   */
+  it("returns default paged collection headers and follows the previous cursor", async () => {
+    const config = testConfig();
+    const store = new InMemoryRegistryStore();
+    for (let i = 1; i <= 51; i += 1) {
+      seedNodeAtTai(store, cassandra.types.Uuid.random(), `0:${i}`);
+    }
+    const subs = new SubscriptionManager(config, store);
+    const app = await createApp({ config, store, subs, logger: false });
+
+    const first = await app.inject({
+      method: "GET",
+      url: "/x-nmos/query/v1.3/nodes",
+    });
+    expect(first.statusCode).toBe(200);
+    expect((first.json() as unknown[]).length).toBe(50);
+    expect(first.headers["x-paging-limit"]).toBe("50");
+    expect(first.headers["x-paging-since"]).toBe("0:1");
+    expect(first.headers["x-paging-until"]).toMatch(/^\d{10,}:\d+$/);
+
+    const prev = linkForRel(first.headers.link, "prev");
+    expect(prev).toBeDefined();
+    const prevUrl = new URL(prev as string);
+    expect(prevUrl.searchParams.get("paging.until")).toBe("0:1");
+    expect(prevUrl.searchParams.get("paging.limit")).toBe("50");
+    const older = await app.inject({
+      method: "GET",
+      url: `${prevUrl.pathname}${prevUrl.search}`,
+    });
+    expect(older.statusCode).toBe(200);
+    const olderBody = older.json() as Array<{ version: string }>;
+    expect(olderBody.map((node) => node.version)).toEqual(["0:1"]);
+    expect(older.headers["x-paging-since"]).toBe("0:0");
+    expect(older.headers["x-paging-until"]).toBe("0:1");
+
+    await app.close();
+  });
+
+  it("uses filtered resource versions for pagination headers", async () => {
+    const config = testConfig();
+    const store = new InMemoryRegistryStore();
+    const target = "pagination-filter";
+    seedNodeAtTai(store, cassandra.types.Uuid.random(), "0:1", {
+      description: target,
+    });
+    seedNodeAtTai(store, cassandra.types.Uuid.random(), "0:2", {
+      description: target,
+    });
+    seedNodeAtTai(store, cassandra.types.Uuid.random(), "0:3", {
+      description: target,
+    });
+    seedNodeAtTai(store, cassandra.types.Uuid.random(), "0:99", {
+      description: "other",
+    });
+    const subs = new SubscriptionManager(config, store);
+    const app = await createApp({ config, store, subs, logger: false });
+
+    const res = await app.inject({
+      method: "GET",
+      url: `/x-nmos/query/v1.3/nodes?paging.limit=2&description=${target}`,
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect((res.json() as unknown[]).length).toBe(2);
+    expect(res.headers["x-paging-since"]).toBe("0:1");
+    expect(res.headers["x-paging-until"]).toMatch(/^\d{10,}:\d+$/);
+
+    await app.close();
+  });
+
+  /**
+   * Tests that invalid paging limits are rejected rather than silently changed.
+   */
+  it("returns 400 for invalid paging.limit values", async () => {
+    const config = testConfig();
+    const store = new InMemoryRegistryStore();
+    const subs = new SubscriptionManager(config, store);
+    const app = await createApp({ config, store, subs, logger: false });
+
+    const nonNumeric = await app.inject({
+      method: "GET",
+      url: "/x-nmos/query/v1.3/nodes?paging.limit=abc",
+    });
+    expect(nonNumeric.statusCode).toBe(400);
+    expect(nonNumeric.json()).toEqual({
+      code: 400,
+      error: "Invalid paging.limit",
+      debug: null,
+    });
+
+    const negative = await app.inject({
+      method: "GET",
+      url: "/x-nmos/query/v1.3/nodes?paging.limit=-1",
+    });
+    expect(negative.statusCode).toBe(400);
+
+    await app.close();
+  });
+
+  it("returns 400 when paging.since is after paging.until", async () => {
+    const config = testConfig();
+    const store = new InMemoryRegistryStore();
+    const subs = new SubscriptionManager(config, store);
+    const app = await createApp({ config, store, subs, logger: false });
+
+    const res = await app.inject({
+      method: "GET",
+      url: "/x-nmos/query/v1.3/nodes?paging.since=10:0&paging.until=9:0",
+    });
+    expect(res.statusCode).toBe(400);
+
     await app.close();
   });
 

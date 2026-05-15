@@ -5,7 +5,7 @@
  * typically the SubscriptionManager. This abstraction allows the change poller
  * to be tested without requiring the full subscription manager.
  */
-/* eslint-disable no-unused-vars */
+
 import type { ChangeEventRow } from "../store/registryPort.js";
 
 /**

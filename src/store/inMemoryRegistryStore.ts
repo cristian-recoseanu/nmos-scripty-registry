@@ -5,7 +5,7 @@
  * without requiring a database. Change log is kept in memory without TTL pruning.
  */
 import cassandra from "cassandra-driver";
-import { taiFromDate } from "../tai.js";
+import { compareTai, taiFromDate, taiNow } from "../tai.js";
 import type {
   ChangeEventRow,
   RegistryPort,
@@ -113,8 +113,8 @@ export class InMemoryRegistryStore implements RegistryPort {
     id: cassandra.types.Uuid,
     apiVersion: string,
     json: string,
-  ): Promise<boolean> {
-    const now = taiFromDate();
+  ): Promise<{ created: boolean; updated_tai: string }> {
+    const now = taiNow();
     const key = resKey(type, id);
     const prev = this.resources.get(key);
     const createdTai = prev?.created_tai ?? now;
@@ -142,7 +142,7 @@ export class InMemoryRegistryStore implements RegistryPort {
       id: id.toString(),
       action: isCreate ? "create" : "update",
     });
-    return isCreate;
+    return { created: isCreate, updated_tai: now };
   }
 
   /**
@@ -250,9 +250,12 @@ export class InMemoryRegistryStore implements RegistryPort {
       const healthRecord = this.health.get(nodeIdStr);
 
       if (!healthRecord) {
-        // Node exists in resources but has no health record - treat as stale
-        stale.push({ id: node.id, updated_tai: "" });
-      } else if (healthRecord.updated_tai < cutoffTai) {
+        // Node has no health record: use its registration time as the baseline.
+        // Only stale if it was registered before the cutoff.
+        if (compareTai(node.updated_tai, cutoffTai) <= 0) {
+          stale.push({ id: node.id, updated_tai: node.updated_tai });
+        }
+      } else if (compareTai(healthRecord.updated_tai, cutoffTai) <= 0) {
         // Node has stale health record
         stale.push({ id: node.id, updated_tai: healthRecord.updated_tai });
       }
