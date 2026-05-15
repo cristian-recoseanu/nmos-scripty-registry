@@ -3,7 +3,7 @@
  *
  * Tests garbage collection of stale nodes and their associated resources.
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import cassandra from "cassandra-driver";
 import { InMemoryRegistryStore } from "./inMemoryRegistryStore.js";
 import { HeartbeatCleanupService } from "./heartbeatCleanupService.js";
@@ -244,8 +244,13 @@ describe("HeartbeatCleanupService", () => {
         JSON.stringify(nodeData),
       );
 
+      // Advance fake time past the GC cutoff so the node's updated_tai is stale
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.advanceTimersByTime(config.heartbeatGcIntervalSeconds * 1000 + 1000);
+
       // Run cleanup - should detect orphaned node and clean it up
       await cleanupService.runCleanup();
+      vi.useRealTimers();
 
       // Verify node is cleaned up
       const node = await store.getResource("nodes", nodeId);

@@ -10,10 +10,32 @@
  * Format: seconds:nanoseconds (IS-04 style).
  * Defaults to current time if no date is provided.
  */
+const TAI_UTC_OFFSET = 37; // leap seconds accumulated since 1972, current value since 2017-01-01
+
 export function taiFromDate(d: Date = new Date()): string {
-  const sec = Math.floor(d.getTime() / 1000);
+  const sec = Math.floor(d.getTime() / 1000) + TAI_UTC_OFFSET;
   const ns = (d.getTime() % 1000) * 1_000_000;
   return `${sec}:${ns}`;
+}
+
+let _lastTai = "0:0";
+
+/**
+ * Returns a strictly monotonically increasing TAI timestamp.
+ * If the wall clock would produce the same or earlier timestamp as the last
+ * call, the nanosecond counter is incremented by 1 to ensure uniqueness.
+ * This prevents sort collisions when multiple resources are registered within
+ * the same millisecond.
+ */
+export function taiNow(): string {
+  const candidate = taiFromDate();
+  if (compareTai(candidate, _lastTai) > 0) {
+    _lastTai = candidate;
+  } else {
+    const [s, ns] = _lastTai.split(":").map(Number);
+    _lastTai = `${s}:${ns + 1}`;
+  }
+  return _lastTai;
 }
 
 /**

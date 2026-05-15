@@ -30,6 +30,11 @@ export default [
       ...tseslint.configs.recommended.rules,
       ...prettierConfig.rules, // Turns off rules that conflict with Prettier
       "prettier/prettier": "error",
+      "no-unused-vars": "off",
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      ],
     },
   },
 ];

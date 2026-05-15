@@ -68,6 +68,11 @@ type Internal = {
    * Used to avoid sync/deletion races while a locally-created subscription is still being written.
    */
   syncedFromStore: boolean;
+  /**
+   * Timestamp (Date.now()) when syncedFromStore was last set to true.
+   * Used to skip premature deletion when a DB snapshot predates the subscription write.
+   */
+  syncedAt: number;
   sockets: Set<WebSocket>;
   socketStates: Map<
     WebSocket,
@@ -173,9 +178,16 @@ export class SubscriptionManager implements SubscriptionEventSink {
       const obj = parseResourceObject(row.json);
       if (Object.keys(filters).length && !matchesFilters(obj, filters))
         continue;
+      const projected = projectResourceForQuery(
+        plural,
+        obj,
+        pathVp,
+        row.api_version,
+      );
       changes.push({
         path: row.id.toString(),
-        post: projectResourceForQuery(plural, obj, pathVp, row.api_version),
+        pre: projected,
+        post: projected,
       });
     }
     return changes;
@@ -234,6 +246,7 @@ export class SubscriptionManager implements SubscriptionEventSink {
       this.subs.set(def.id, {
         def,
         syncedFromStore: true,
+        syncedAt: Date.now(),
         sockets: new Set(),
         socketStates: new Map(),
         lastSendAt: 0,
@@ -265,6 +278,7 @@ export class SubscriptionManager implements SubscriptionEventSink {
     this.subs.set(id, {
       def,
       syncedFromStore: false,
+      syncedAt: 0,
       sockets: new Set(),
       socketStates: new Map(),
       lastSendAt: 0,
@@ -277,7 +291,9 @@ export class SubscriptionManager implements SubscriptionEventSink {
       cassandra.types.Uuid.fromString(def.id),
       JSON.stringify(def),
     );
-    this.subs.get(id)!.syncedFromStore = true;
+    const entry = this.subs.get(id)!;
+    entry.syncedFromStore = true;
+    entry.syncedAt = Date.now();
     logger.info("Subscription created in manager", {
       id,
       resource_path: def.resource_path,
@@ -342,10 +358,14 @@ export class SubscriptionManager implements SubscriptionEventSink {
       remoteById.set(def.id, def);
     }
 
+    const snapshotAt = Date.now();
     // Remove any locally-known persisted subscriptions that disappeared from the DB.
+    // Skip entries whose syncedAt is newer than the snapshot time: the DB query was
+    // issued before savePersistedSubscription completed, so the absence is a stale read.
     const toDelete: string[] = [];
     for (const [id, internal] of this.subs.entries()) {
       if (!internal.syncedFromStore) continue;
+      if (internal.syncedAt > snapshotAt) continue;
       if (!remoteById.has(id)) toDelete.push(id);
     }
     for (const id of toDelete) {
@@ -358,11 +378,13 @@ export class SubscriptionManager implements SubscriptionEventSink {
       if (internal) {
         internal.def = remoteDef;
         internal.syncedFromStore = true;
+        internal.syncedAt = Date.now();
         continue;
       }
       this.subs.set(id, {
         def: remoteDef,
         syncedFromStore: true,
+        syncedAt: Date.now(),
         sockets: new Set(),
         socketStates: new Map(),
         lastSendAt: 0,
@@ -501,14 +523,22 @@ export class SubscriptionManager implements SubscriptionEventSink {
       const preObj = ev.pre_json ? parseResourceObject(ev.pre_json) : null;
       const postObj = ev.post_json ? parseResourceObject(ev.post_json) : null;
       const filters = this.subscriptionMatchParams(internal.def.params);
-      const matchObj = postObj ?? preObj;
-      if (!matchObj) continue;
-      if (Object.keys(filters).length && !matchesFilters(matchObj, filters))
-        continue;
+      const hasFilters = Object.keys(filters).length > 0;
+      const preMatches =
+        preObj !== null && (!hasFilters || matchesFilters(preObj, filters));
+      const postMatches =
+        postObj !== null && (!hasFilters || matchesFilters(postObj, filters));
+      if (!preMatches && !postMatches) continue;
+      const evToDispatch: ChangeEventRow =
+        preMatches && !postMatches
+          ? { ...ev, post_json: null }
+          : !preMatches && postMatches
+            ? { ...ev, pre_json: null }
+            : ev;
       for (const state of internal.socketStates.values()) {
-        if (state.syncing) state.buffered.push(ev);
+        if (state.syncing) state.buffered.push(evToDispatch);
       }
-      this.enqueue(internal, ev);
+      this.enqueue(internal, evToDispatch);
     }
   }
 

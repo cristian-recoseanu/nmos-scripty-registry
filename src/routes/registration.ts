@@ -240,9 +240,15 @@ export const registrationRoutes: FastifyPluginAsync<{
       }
 
       const json = JSON.stringify(body.data);
-      const created = await store.upsertResource(plural, id, version, json);
+      const { created, updated_tai } = await store.upsertResource(
+        plural,
+        id,
+        version,
+        json,
+      );
       const loc = resourceLocation(version, plural, idRaw);
       void reply.header("Location", loc);
+      void reply.header("X-Paging-Timestamp", updated_tai);
       logger.info("Resource registered", { type: plural, id: idRaw, created });
       if (created) return reply.code(201).send(body.data);
       return reply.code(200).send(body.data);

@@ -17,12 +17,16 @@ import {
   applyPagingAndSort,
   assertSupportedQueryParams,
   extractAttributeFilters,
+  generatePagingLinks,
   matchesFilters,
+  PagingError,
   parsePaging,
   parseResourceObject,
+  type Paging,
   type ResourceRow,
 } from "../query/resourceQuery.js";
 import { projectResourceForQuery } from "../query/versionProjection.js";
+import { taiNow } from "../tai.js";
 import type { RegistryPort, ResourcePlural } from "../store/registryPort.js";
 import type { SubscriptionManager } from "../subscriptions/subscriptionManager.js";
 import logger from "../logger.js";
@@ -125,8 +129,17 @@ export const queryRoutes: FastifyPluginAsync<{
           unsupported.join(", "),
         );
       }
-      const paging = parsePaging(q);
+      let paging: Paging;
+      try {
+        paging = parsePaging(q);
+      } catch (err) {
+        if (err instanceof PagingError) {
+          return sendError(reply, 400, err.message, null);
+        }
+        throw err;
+      }
       const filters = extractAttributeFilters(q);
+      const snapshotUntil = taiNow();
       let rows = await toRows(c);
       rows = rows.filter((row) =>
         shouldIncludeStoredResource(
@@ -140,8 +153,22 @@ export const queryRoutes: FastifyPluginAsync<{
           matchesFilters(parseResourceObject(row.json), filters),
         );
       }
-      rows = applyPagingAndSort(rows, paging);
-      const body = rows.map((row) =>
+      logger.debug("Query before pagination", {
+        filters,
+        totalRows: rows.length,
+        pagingSince: paging.since,
+        pagingUntil: paging.until,
+        pagingLimit: paging.limit,
+      });
+      const pagingResult = applyPagingAndSort(rows, paging, snapshotUntil);
+      logger.debug("Query after pagination", {
+        returnedRows: pagingResult.rows.length,
+        actualSince: pagingResult.actualSince,
+        actualUntil: pagingResult.actualUntil,
+        hasNext: pagingResult.hasNext,
+        hasPrev: pagingResult.hasPrev,
+      });
+      const body = pagingResult.rows.map((row) =>
         projectResourceForQuery(
           c,
           parseResourceObject(row.json),
@@ -149,9 +176,32 @@ export const queryRoutes: FastifyPluginAsync<{
           row.api_version,
         ),
       );
-      if (paging.limit !== undefined) {
-        void reply.header("X-Paging-Limit", String(paging.limit));
+
+      // Add pagination headers as per NMOS IS-04 spec
+      // X-Paging-Limit MUST be returned in all cases where pagination is in use
+      void reply.header("X-Paging-Limit", String(paging.limit));
+
+      // X-Paging-Since and X-Paging-Until should be included when pagination is in use
+      // Use actual values when available, otherwise use request parameters or defaults
+      if (pagingResult.actualSince) {
+        void reply.header("X-Paging-Since", pagingResult.actualSince);
+      } else {
+        void reply.header("X-Paging-Since", paging.since || "0:0");
       }
+
+      if (pagingResult.actualUntil) {
+        void reply.header("X-Paging-Until", pagingResult.actualUntil);
+      } else {
+        void reply.header("X-Paging-Until", paging.until || "0:0");
+      }
+
+      // Add Link header with navigation links
+      const baseUrl = `${req.protocol}://${req.host}${req.url.split("?")[0]}`;
+      const links = generatePagingLinks(baseUrl, paging, pagingResult, q);
+      if (links.length > 0) {
+        void reply.header("Link", links.join(", "));
+      }
+
       return reply.send(body);
     });
 
@@ -233,11 +283,15 @@ export const queryRoutes: FastifyPluginAsync<{
       id: def.id,
       resource_path: def.resource_path,
     });
-    return reply.send(def);
+    const location = `${req.url}/${def.id}`;
+    void reply.header("Location", location);
+    return reply.code(201).send(def);
   });
 
   app.get("/subscriptions", async (_req, reply) => {
-    return reply.send(subs.list());
+    return reply.send(
+      subs.list().filter((s) => s.queryApiPathVersion === apiPathVersion),
+    );
   });
 
   app.options("/subscriptions/:subscriptionId", async (_req, reply) =>

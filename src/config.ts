@@ -136,8 +136,18 @@ export function loadConfig(): RegistryConfig {
     host,
     port,
     supportedApiVersions,
-    keyspace,
-    localDataCenter,
+    queryApiSourceId,
+    publicHttpBase,
+    publicWsBase,
+    scylla: {
+      contactPoints,
+      localDataCenter,
+      keyspace,
+      replicationFactor,
+    },
+    changePollMs,
+    changeLogTtlSeconds,
+    heartbeatGcIntervalSeconds,
   });
   return config;
 }

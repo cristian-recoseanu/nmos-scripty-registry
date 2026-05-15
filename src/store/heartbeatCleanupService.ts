@@ -18,6 +18,7 @@ export class HeartbeatCleanupService {
   private readonly store: RegistryPort;
   private readonly config: RegistryConfig;
   private readonly intervalMs: number;
+  private readonly pollMs = 1000;
   private timeoutId: ReturnType<typeof setTimeout> | null = null;
   private isRunning = false;
 
@@ -117,6 +118,6 @@ export class HeartbeatCleanupService {
           this.scheduleNextRun();
         });
       }
-    }, this.intervalMs);
+    }, this.pollMs);
   }
 }

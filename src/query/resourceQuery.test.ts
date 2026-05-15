@@ -98,6 +98,41 @@ describe("resourceQuery", () => {
       limit: 1,
       order: "update",
     });
-    expect(out.map((r) => r.id)).toEqual(["2"]);
+    expect(out.rows.map((r) => r.id)).toEqual(["2"]);
+  });
+
+  it("uses server-side updated_tai for update-order pagination", () => {
+    const rows: ResourceRow[] = [
+      {
+        id: "1",
+        json: '{"version":"10:0"}',
+        api_version: "v1.3",
+        created_tai: "1:0",
+        updated_tai: "100:0",
+      },
+      {
+        id: "2",
+        json: '{"version":"20:0"}',
+        api_version: "v1.3",
+        created_tai: "2:0",
+        updated_tai: "200:0",
+      },
+      {
+        id: "3",
+        json: '{"version":"30:0"}',
+        api_version: "v1.3",
+        created_tai: "3:0",
+        updated_tai: "300:0",
+      },
+    ];
+
+    const out = applyPagingAndSort(rows, {
+      limit: 2,
+      order: "update",
+    });
+
+    expect(out.rows.map((r) => r.id)).toEqual(["3", "2"]);
+    expect(out.actualSince).toBe("100:0");
+    expect(out.actualUntil).toBe("300:0");
   });
 });

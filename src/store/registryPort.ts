@@ -4,7 +4,7 @@
  * This module defines the RegistryPort interface that abstracts the persistence layer,
  * allowing different implementations (ScyllaDB, in-memory) to be used interchangeably.
  */
-/* eslint-disable no-unused-vars */
+
 import type cassandra from "cassandra-driver";
 
 /**
@@ -72,11 +72,12 @@ export interface RegistryPort {
   listResources(...args: [ResourcePlural]): Promise<StoredResource[]>;
 
   /**
-   * Creates or updates a resource. Returns true if created, false if updated.
+   * Creates or updates a resource. Returns created=true if created (false if updated),
+   * and the server-assigned updated_tai for use in X-Paging-Timestamp responses.
    */
   upsertResource(
     ...args: [ResourcePlural, cassandra.types.Uuid, string, string]
-  ): Promise<boolean>;
+  ): Promise<{ created: boolean; updated_tai: string }>;
 
   /**
    * Deletes a resource. Returns true if deleted, false if not found.
