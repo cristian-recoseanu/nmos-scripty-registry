@@ -1,0 +1,112 @@
+name: NMOS API Tests
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Use Node.js 24.x
+      uses: actions/setup-node@v4
+      with:
+        node-version: 24.x
+        cache: 'npm'
+        cache-dependency-path: package-lock.json
+    
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.9'
+    
+    - name: Clone nmos-testing
+      run: |
+        git clone https://github.com/AMWA-TV/nmos-testing.git nmos-testing
+
+    - name: Install nmos-testing Requirements
+      run: |
+        sudo pip install --upgrade pip
+        sudo pip install -r nmos-testing/requirements.txt
+
+    - name: Verify Python
+      run: |
+        python --version
+        pip --version
+        pip list
+    
+    - name: Install node dependencies
+      run: npm ci
+
+    - name: Get local IP
+      run: |
+        local_ip=$(hostname -I | awk '{print $1}')
+        echo "Local IP: $local_ip"
+        echo "LocalIP=$local_ip" >> $GITHUB_ENV
+
+    - name: Start ScyllaDB
+      run: |
+        docker compose -f docker-compose-scylla.yml up -d
+        docker compose -f docker-compose-scylla.yml wait scylla
+
+    - name: Start registry app
+      run: |
+        export PUBLIC_HTTP_BASE="http://$LocalIP:8080"
+        export PUBLIC_WS_BASE="ws://$LocalIP:8080"
+        npm run build
+        npm start &
+        echo $! > node_pid.txt
+        sleep 10  # wait for app to start
+
+    - name: Copy UserConfig.py
+      run: |
+        mkdir -p nmos-testing/nmostesting
+        cp nmos-testing-configuration/UserConfig.py nmos-testing/nmostesting/UserConfig.py
+        echo "UserConfig.py:"
+        cat nmos-testing/nmostesting/UserConfig.py
+
+    - name: Run IS-04-02 test suite
+      working-directory: nmos-testing
+      run: |
+        echo "Using IP: $LocalIP"
+        mkdir -p ../test_results
+        sudo $(which python) nmos-test.py suite IS-04-02 \
+          --host $LocalIP $LocalIP \
+          --port 8080 8080 \
+          --version v1.3 v1.3 \
+          --output ../test_results/is_04_02_results.json || true
+
+    - name: Check IS-04-02 test results
+      run: |
+        RESULTS_FILE="test_results/is_04_02_results.json"
+
+        if [ ! -f "$RESULTS_FILE" ]; then
+          echo "ERROR: Results file $RESULTS_FILE not found"
+          exit 1
+        fi
+
+        # Extract failed tests
+        FAILED=$(jq -r '.results[] | select(.state=="Fail") | "\(.name): \(.state), detail: \(.detail // "")"' "$RESULTS_FILE")
+
+        if [ -n "$FAILED" ]; then
+          echo "❌ Test Failures:"
+          echo "$FAILED"
+          exit 1
+        else
+          echo "✅ All tests passed"
+        fi
+
+    - name: Stop registry app
+      if: always()
+      run: |
+        if [ -f node_pid.txt ]; then
+          kill $(cat node_pid.txt) || true
+        fi
+
+    - name: Stop ScyllaDB
+      if: always()
+      run: |
+        docker compose -f docker-compose-scylla.yml down
