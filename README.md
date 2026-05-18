@@ -1,8 +1,11 @@
 # nmos-scripty-registry
 
 [![Unit Tests](https://github.com/cristian-recoseanu/nmos-scripty-registry/actions/workflows/unit_tests.yml/badge.svg)](https://github.com/cristian-recoseanu/nmos-scripty-registry/actions/workflows/unit_tests.yml)
+[![NMOS API Tests](https://github.com/cristian-recoseanu/nmos-scripty-registry/actions/workflows/nmos_api_tests.yml/badge.svg)](https://github.com/cristian-recoseanu/nmos-scripty-registry/actions/workflows/nmos_api_tests.yml)
 
-An [NMOS IS-04](https://specs.amwa.tv/is-04/) Discovery and Registration registry: **Registration API** and **Query API**. Persistence targets **[ScyllaDB](https://www.scylladb.com/)** via the Cassandra protocol (`cassandra-driver`). DNS-SD / mDNS are out of scope for this codebase.
+An [NMOS IS-04](https://specs.amwa.tv/is-04/) registry: **Registration API** and **Query API**. Persistence targets **[ScyllaDB](https://www.scylladb.com/)** via the Cassandra protocol (`cassandra-driver`). mDNS is out of scope for this codebase.
+
+For DNS-SD follow the guide available in [AMWA INFO-004](https://specs.amwa.tv/info-004/) in order to set up the correct entries in your preferred DNS server.
 
 ---
 
