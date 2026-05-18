@@ -29,6 +29,7 @@ jobs:
 
     - name: Install nmos-testing Requirements
       run: |
+        sudo pip install gitpython
         sudo pip install --ignore-installed -r nmos-testing/requirements.txt
 
     - name: Verify Python
