@@ -29,11 +29,14 @@ jobs:
 
     - name: Install nmos-testing Requirements
       run: |
-        sudo pip install gitpython
-        sudo pip install --ignore-installed -r nmos-testing/requirements.txt
+        python -m venv venv
+        source venv/bin/activate
+        pip install --upgrade pip
+        pip install -r nmos-testing/requirements.txt
 
     - name: Verify Python
       run: |
+        source venv/bin/activate
         python --version
         pip --version
         pip list
@@ -74,7 +77,7 @@ jobs:
       run: |
         echo "Using IP: $LocalIP"
         mkdir -p ../test_results
-        sudo $(which python) nmos-test.py suite IS-04-02 \
+        sudo ../venv/bin/python nmos-test.py suite IS-04-02 \
           --host $LocalIP $LocalIP \
           --port 8080 8080 \
           --version v1.3 v1.3 \
