@@ -29,7 +29,6 @@ jobs:
 
     - name: Install nmos-testing Requirements
       run: |
-        sudo pip install --upgrade pip
         sudo pip install -r nmos-testing/requirements.txt
 
     - name: Verify Python
