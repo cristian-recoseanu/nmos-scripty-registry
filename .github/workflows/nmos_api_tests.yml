@@ -49,7 +49,8 @@ jobs:
     - name: Start ScyllaDB
       run: |
         docker compose -f docker-compose-scylla.yml up -d
-        docker compose -f docker-compose-scylla.yml wait scylla
+        # Wait for ScyllaDB to be healthy (max 3 minutes)
+        timeout 180 bash -c 'until docker compose -f docker-compose-scylla.yml ps scylla | grep -q "healthy"; do sleep 5; done'
 
     - name: Start registry app
       run: |
