@@ -3,7 +3,8 @@
 [![Unit Tests](https://github.com/cristian-recoseanu/nmos-scripty-registry/actions/workflows/unit_tests.yml/badge.svg)](https://github.com/cristian-recoseanu/nmos-scripty-registry/actions/workflows/unit_tests.yml)
 [![NMOS API Tests](https://github.com/cristian-recoseanu/nmos-scripty-registry/actions/workflows/nmos_api_tests.yml/badge.svg)](https://github.com/cristian-recoseanu/nmos-scripty-registry/actions/workflows/nmos_api_tests.yml)
 
-An [NMOS IS-04](https://specs.amwa.tv/is-04/) registry: **Registration API** and **Query API**. Persistence targets **[ScyllaDB](https://www.scylladb.com/)** via the Cassandra protocol (`cassandra-driver`). mDNS is out of scope for this codebase.
+An [NMOS IS-04](https://specs.amwa.tv/is-04/) registry: **Registration API** and **Query API**. Persistence targets **[ScyllaDB](https://www.scylladb.com/)** via the Cassandra protocol (`cassandra-driver`).  
+mDNS is out of scope for this codebase.
 
 For DNS-SD follow the guide available in [AMWA INFO-004](https://specs.amwa.tv/info-004/) in order to set up the correct entries in your preferred DNS server.
 
@@ -97,7 +98,7 @@ npm run lint
 npm test
 ```
 
-[Vitest](https://vitest.dev/) runs all `src/**/*.test.ts` files: pure helpers (`tai`, `resourceQuery`, `timeBuckets`, `grain`), the in-memory store, `ChangePoller` + stub sink, `SubscriptionManager` with a mock `WebSocket` + fake timers, and **`createApp`** HTTP integration-style checks (still in-process, no Scylla).
+[Vitest](https://vitest.dev/) runs all `src/**/*.test.ts` files.
 
 ```bash
 npm run test:watch
@@ -116,12 +117,12 @@ EXTERNAL_HOST=YOUR_EXTERNAL_IP docker compose up -d --build
 or you run the one with the load balancer
 
 ```bash
-sudo EXTERNAL_HOST=192.100.200.1 LB_PORT=8082 HEARTBEAT_GC_INTERVAL_SECONDS=60 docker compose -f docker-compose-cluster.yml up --build
+EXTERNAL_HOST=192.100.200.1 LB_PORT=8082 HEARTBEAT_GC_INTERVAL_SECONDS=12 docker compose -f docker-compose-cluster.yml up --build
 ```
 
 and shutdown
 ```bash
-sudo docker compose -f docker-compose-cluster.yml down --timeout 90
+docker compose -f docker-compose-cluster.yml down --timeout 90 --remove-orphans
 ```
 
 Wait until Scylla accepts CQL on `9042`, then start the registry.
@@ -142,5 +143,6 @@ Wait until Scylla accepts CQL on `9042`, then start the registry.
 | `SCYLLA_REPLICATION_FACTOR`     | `1`                       | Per-datacenter RF for `NetworkTopologyStrategy`                                                                                                                                                               |
 | `CHANGE_POLL_MS`                | `200`                     | How often each instance polls `change_log`                                                                                                                                                                    |
 | `CHANGE_LOG_TTL_SECONDS`        | `604800` (7d)             | TTL applied to `change_log` rows                                                                                                                                                                              |
+| `PERSISTED_SUBSCRIPTION_TTL_SECONDS` | `86400` (24h)        | TTL for `persisted_subscriptions` rows (refreshed periodically while sockets are connected)                                                                                                                 |
 | `HEARTBEAT_GC_INTERVAL_SECONDS` | `12`                      | Heartbeat garbage collection interval (IS-04 default)                                                                                                                                                         |
 | `LOG_LEVEL`                      | `info`                    | Logging level (e.g., `info`, `debug`, `warn`, `error`)                                                                                                                                                        |
