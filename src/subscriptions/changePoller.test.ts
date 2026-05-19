@@ -26,4 +26,39 @@ describe("ChangePoller", () => {
     await poller.poll();
     expect(seen).toEqual([`create:${nid.toString()}`]);
   });
+
+  it("fastForwardToNow skips pre-existing change_log entries written before startup", async () => {
+    const store = new InMemoryRegistryStore();
+    const seen: string[] = [];
+    const sink: SubscriptionEventSink = {
+      dispatchEvent(ev) {
+        seen.push(`${ev.action}:${ev.resource_id.toString()}`);
+      },
+    };
+
+    const staleId = cassandra.types.Uuid.random();
+    await store.upsertResource(
+      "nodes",
+      staleId,
+      "v1.3",
+      `{"id":"${staleId.toString()}","label":"stale"}`,
+    );
+
+    const poller = new ChangePoller(store, sink, 60_000);
+    poller.fastForwardToNow();
+
+    await poller.poll();
+    expect(seen).toEqual([]);
+
+    const freshId = cassandra.types.Uuid.random();
+    await store.upsertResource(
+      "nodes",
+      freshId,
+      "v1.3",
+      `{"id":"${freshId.toString()}","label":"fresh"}`,
+    );
+
+    await poller.poll();
+    expect(seen).toEqual([`create:${freshId.toString()}`]);
+  });
 });

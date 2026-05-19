@@ -35,6 +35,7 @@ function testConfig(): RegistryConfig {
     },
     changePollMs: 200,
     changeLogTtlSeconds: 3600,
+    persistedSubscriptionTtlSeconds: 86400,
     heartbeatGcIntervalSeconds: 12,
   };
 }

@@ -32,6 +32,7 @@ describe("HeartbeatCleanupService", () => {
       },
       changePollMs: 200,
       changeLogTtlSeconds: 604800,
+      persistedSubscriptionTtlSeconds: 86400,
       heartbeatGcIntervalSeconds: 12,
     };
     cleanupService = new HeartbeatCleanupService(store, config);
