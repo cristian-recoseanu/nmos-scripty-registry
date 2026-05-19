@@ -212,6 +212,7 @@ export class InMemoryRegistryStore implements RegistryPort {
   async savePersistedSubscription(
     id: cassandra.types.Uuid,
     json: string,
+    _ttlSeconds: number,
   ): Promise<void> {
     this.persistedSubs.set(id.toString(), { id, json });
   }
@@ -221,6 +222,15 @@ export class InMemoryRegistryStore implements RegistryPort {
    */
   async deletePersistedSubscription(id: cassandra.types.Uuid): Promise<void> {
     this.persistedSubs.delete(id.toString());
+  }
+
+  /**
+   * Fetches a single persisted subscription by ID from memory.
+   */
+  async getPersistedSubscription(
+    id: cassandra.types.Uuid,
+  ): Promise<{ id: cassandra.types.Uuid; json: string } | null> {
+    return this.persistedSubs.get(id.toString()) ?? null;
   }
 
   /**

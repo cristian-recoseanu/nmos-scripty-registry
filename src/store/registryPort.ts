@@ -110,13 +110,20 @@ export interface RegistryPort {
    * Saves a persisted subscription definition.
    */
   savePersistedSubscription(
-    ...args: [cassandra.types.Uuid, string]
+    ...args: [cassandra.types.Uuid, string, number]
   ): Promise<void>;
 
   /**
    * Deletes a persisted subscription.
    */
   deletePersistedSubscription(...args: [cassandra.types.Uuid]): Promise<void>;
+
+  /**
+   * Fetches a single persisted subscription by ID.
+   */
+  getPersistedSubscription(
+    ...args: [cassandra.types.Uuid]
+  ): Promise<{ id: cassandra.types.Uuid; json: string } | null>;
 
   /**
    * Lists all persisted subscriptions.

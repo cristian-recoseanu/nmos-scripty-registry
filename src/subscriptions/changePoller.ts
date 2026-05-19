@@ -38,6 +38,23 @@ export class ChangePoller {
   }
 
   /**
+   * Advances the per-bucket cursors to "now" without dispatching any events.
+   * Call this once before start() so that the poller only picks up events that
+   * occur after the process starts, skipping stale history already in the log.
+   * This is safe for HA: each instance independently starts from its own startup
+   * point; the change_log is not modified and other instances are unaffected.
+   */
+  fastForwardToNow() {
+    const now = cassandra.types.TimeUuid.now();
+    for (const bucket of this.bucketsToScan()) {
+      this.lastIdPerBucket.set(bucket, now);
+    }
+    logger.info("Change poller fast-forwarded to now", {
+      buckets: this.bucketsToScan(),
+    });
+  }
+
+  /**
    * Starts the change poller with periodic polling.
    */
   start() {

@@ -299,7 +299,7 @@ export const queryRoutes: FastifyPluginAsync<{
   );
   app.get("/subscriptions/:subscriptionId", async (req, reply) => {
     const { subscriptionId } = req.params as { subscriptionId: string };
-    const s = subs.get(subscriptionId);
+    const s = await subs.get(subscriptionId);
     if (!s) return sendError(reply, 404, "Not found", null);
     return reply.send(s);
   });

@@ -234,13 +234,12 @@ export class SubscriptionManager implements SubscriptionEventSink {
         def.queryApiPathVersion = fallbackVersion;
       }
       def.ws_href = this.buildWsHref(def.id, def.secure);
-      // Persist=false subscriptions should not survive a process restart: since there are no
-      // connected WebSocket clients after restart, treat them as already having had their
-      // "last disconnect" event.
+      // Persist=false subscriptions should not survive a process restart on this instance:
+      // there are no connected WebSocket clients after restart. Skip restoring them into
+      // memory, but do NOT delete the DB row — other instances in the cluster may still
+      // be serving live WebSocket clients for these subscriptions. The DB TTL handles
+      // orphan cleanup once no instance writes a refresh.
       if (!def.persist) {
-        await this.store.deletePersistedSubscription(
-          cassandra.types.Uuid.fromString(def.id),
-        );
         continue;
       }
       this.subs.set(def.id, {
@@ -290,6 +289,7 @@ export class SubscriptionManager implements SubscriptionEventSink {
     await this.store.savePersistedSubscription(
       cassandra.types.Uuid.fromString(def.id),
       JSON.stringify(def),
+      this.config.persistedSubscriptionTtlSeconds,
     );
     const entry = this.subs.get(id)!;
     entry.syncedFromStore = true;
@@ -304,9 +304,44 @@ export class SubscriptionManager implements SubscriptionEventSink {
 
   /**
    * Retrieves a subscription definition by ID.
+   * Falls back to the store on a cache miss so that GET /subscriptions/:id
+   * succeeds even when the POST landed on a different instance and the sync
+   * poller has not yet run on this one.
    */
-  get(defId: string): SubscriptionDef | null {
-    return this.subs.get(defId)?.def ?? null;
+  async get(defId: string): Promise<SubscriptionDef | null> {
+    const cached = this.subs.get(defId);
+    if (cached) return cached.def;
+
+    const fallbackVersion =
+      this.config.supportedApiVersions[
+        this.config.supportedApiVersions.length - 1
+      ] ?? "v1.3";
+
+    let row: { id: cassandra.types.Uuid; json: string } | null;
+    try {
+      row = await this.store.getPersistedSubscription(
+        cassandra.types.Uuid.fromString(defId),
+      );
+    } catch {
+      return null;
+    }
+    if (!row) return null;
+
+    const def = JSON.parse(row.json) as SubscriptionDef;
+    if (!def.queryApiPathVersion) def.queryApiPathVersion = fallbackVersion;
+    def.ws_href = this.buildWsHref(def.id, def.secure);
+
+    this.subs.set(defId, {
+      def,
+      syncedFromStore: true,
+      syncedAt: Date.now(),
+      sockets: new Set(),
+      socketStates: new Map(),
+      lastSendAt: 0,
+      queued: [],
+      flushTimer: null,
+    });
+    return def;
   }
 
   /**
@@ -336,6 +371,23 @@ export class SubscriptionManager implements SubscriptionEventSink {
     );
     logger.info("Subscription deleted from manager", { defId });
     return true;
+  }
+
+  /**
+   * Re-writes persisted_subscriptions rows for any subscription that currently has
+   * active WebSocket sockets, resetting the per-row TTL clock. Call this on the
+   * same cadence as syncPersistedFromStore() so rows never expire while a client
+   * is still connected.
+   */
+  async refreshPersistedTtls(): Promise<void> {
+    for (const [id, internal] of this.subs.entries()) {
+      if (internal.sockets.size === 0) continue;
+      await this.store.savePersistedSubscription(
+        cassandra.types.Uuid.fromString(id),
+        JSON.stringify(internal.def),
+        this.config.persistedSubscriptionTtlSeconds,
+      );
+    }
   }
 
   /**
