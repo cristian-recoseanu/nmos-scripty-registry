@@ -53,6 +53,7 @@ export class PersistedSubscriptionSyncPoller {
     if (this.inFlight) return;
     this.inFlight = true;
     try {
+      await this.mgr.refreshPersistedTtls();
       await this.mgr.syncPersistedFromStore();
       logger.debug("Persisted subscription sync completed");
     } finally {

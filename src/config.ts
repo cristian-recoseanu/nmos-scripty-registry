@@ -34,6 +34,8 @@ export type RegistryConfig = {
   };
   changePollMs: number;
   changeLogTtlSeconds: number;
+  /** TTL in seconds for persisted_subscriptions rows (orphan cleanup). Default 24h. */
+  persistedSubscriptionTtlSeconds: number;
   /** Heartbeat garbage collection interval in seconds (default 12 per IS-04 spec) */
   heartbeatGcIntervalSeconds: number;
 };
@@ -112,9 +114,12 @@ export function loadConfig(): RegistryConfig {
   const replicationFactor = Number(
     envOptional("SCYLLA_REPLICATION_FACTOR", "1"),
   );
-  const changePollMs = Number(envOptional("CHANGE_POLL_MS", "200"));
+  const changePollMs = Number(envOptional("CHANGE_POLL_MS", "100"));
   const changeLogTtlSeconds = Number(
     envOptional("CHANGE_LOG_TTL_SECONDS", String(7 * 24 * 3600)),
+  );
+  const persistedSubscriptionTtlSeconds = Number(
+    envOptional("PERSISTED_SUBSCRIPTION_TTL_SECONDS", String(24 * 3600)),
   );
   const heartbeatGcIntervalSeconds = Number(
     envOptional("HEARTBEAT_GC_INTERVAL_SECONDS", "12"),
@@ -130,6 +135,7 @@ export function loadConfig(): RegistryConfig {
     scylla: { contactPoints, localDataCenter, keyspace, replicationFactor },
     changePollMs,
     changeLogTtlSeconds,
+    persistedSubscriptionTtlSeconds,
     heartbeatGcIntervalSeconds,
   };
   logger.info("Configuration loaded", {
@@ -147,6 +153,7 @@ export function loadConfig(): RegistryConfig {
     },
     changePollMs,
     changeLogTtlSeconds,
+    persistedSubscriptionTtlSeconds,
     heartbeatGcIntervalSeconds,
   });
   return config;

@@ -37,6 +37,7 @@ async function main() {
   logger.info("Persisted subscription sync poller started");
 
   const poller = new ChangePoller(store, subs, config.changePollMs);
+  poller.fastForwardToNow();
   poller.start();
   void poller.poll();
   logger.info("Change poller started");

@@ -23,6 +23,7 @@ function testConfig(): RegistryConfig {
     },
     changePollMs: 200,
     changeLogTtlSeconds: 3600,
+    persistedSubscriptionTtlSeconds: 86400,
     heartbeatGcIntervalSeconds: 12,
   };
 }
@@ -267,17 +268,15 @@ describe("SubscriptionManager", () => {
       queryApiPathVersion: "v1.3",
     });
 
-    expect(mgr2.get(sub.id)).toBe(null);
-
-    await mgr2.syncPersistedFromStore();
-    expect(mgr2.get(sub.id)?.id).toBe(sub.id);
+    // get() falls back to the store on cache miss, so the subscription is visible
+    // on mgr2 immediately after mgr1 writes it — no explicit sync needed.
+    expect((await mgr2.get(sub.id))?.id).toBe(sub.id);
 
     await mgr1.delete(sub.id);
-    // mgr2 hasn't synced yet, so it still has the definition in memory.
-    expect(mgr2.get(sub.id)).not.toBe(null);
-
+    // mgr2 has the definition cached in memory from the fallback lookup above.
+    // After syncPersistedFromStore() it will notice the row is gone and evict it.
     await mgr2.syncPersistedFromStore();
-    expect(mgr2.get(sub.id)).toBe(null);
+    expect(await mgr2.get(sub.id)).toBe(null);
   });
 
   it("syncs non-persisted subscriptions across instances", async () => {
@@ -295,10 +294,8 @@ describe("SubscriptionManager", () => {
       queryApiPathVersion: "v1.3",
     });
 
-    expect(mgr2.get(sub.id)).toBe(null);
-
-    await mgr2.syncPersistedFromStore();
-    expect(mgr2.get(sub.id)?.id).toBe(sub.id);
+    // get() falls back to the store on cache miss, so visible on mgr2 immediately.
+    expect((await mgr2.get(sub.id))?.id).toBe(sub.id);
   });
 
   it("attachSocket pulls persisted subscription on demand across instances", async () => {
@@ -320,7 +317,7 @@ describe("SubscriptionManager", () => {
     // No explicit sync here: attachSocket should self-heal by syncing.
     const ok = await mgr2.attachSocket(sub.id, mockWs(sent));
     expect(ok).toBe(true);
-    expect(mgr2.get(sub.id)?.id).toBe(sub.id);
+    expect((await mgr2.get(sub.id))?.id).toBe(sub.id);
   });
 
   it("deletes persist=false subscription after last local disconnect", async () => {
@@ -340,7 +337,7 @@ describe("SubscriptionManager", () => {
 
     // Ensure the other instance sees the definition before disconnect.
     await mgr2.syncPersistedFromStore();
-    expect(mgr2.get(sub.id)).not.toBe(null);
+    expect(await mgr2.get(sub.id)).not.toBe(null);
 
     const ws = mockWsWithClose([]);
     expect(await mgr1.attachSocket(sub.id, ws)).toBe(true);
@@ -352,6 +349,6 @@ describe("SubscriptionManager", () => {
     await Promise.resolve();
 
     await mgr2.syncPersistedFromStore();
-    expect(mgr2.get(sub.id)).toBe(null);
+    expect(await mgr2.get(sub.id)).toBe(null);
   });
 });

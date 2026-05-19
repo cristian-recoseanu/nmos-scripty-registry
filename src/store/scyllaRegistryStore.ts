@@ -51,9 +51,10 @@ const UPSERT_HEALTH = `
 
 const SELECT_HEALTH = `SELECT node_id, json, updated_tai FROM node_health WHERE node_id = ?`;
 
-const UPSERT_PERSISTED_SUB = `INSERT INTO persisted_subscriptions (id, json) VALUES (?, ?)`;
+const UPSERT_PERSISTED_SUB = `INSERT INTO persisted_subscriptions (id, json) VALUES (?, ?) USING TTL ?`;
 const DELETE_PERSISTED_SUB = `DELETE FROM persisted_subscriptions WHERE id = ?`;
 const SELECT_ALL_PERSISTED_SUBS = `SELECT id, json FROM persisted_subscriptions`;
+const SELECT_PERSISTED_SUB = `SELECT id, json FROM persisted_subscriptions WHERE id = ?`;
 
 const SELECT_STALE_NODES = `SELECT node_id, updated_tai FROM node_health`;
 const SELECT_ALL_NODES = `SELECT id, updated_tai FROM resources WHERE resource_type = 'nodes'`;
@@ -244,8 +245,12 @@ export class ScyllaRegistryStore implements RegistryPort {
   /**
    * Saves a persisted subscription definition to ScyllaDB.
    */
-  async savePersistedSubscription(id: cassandra.types.Uuid, json: string) {
-    await this.client.execute(UPSERT_PERSISTED_SUB, [id, json], {
+  async savePersistedSubscription(
+    id: cassandra.types.Uuid,
+    json: string,
+    ttlSeconds: number,
+  ) {
+    await this.client.execute(UPSERT_PERSISTED_SUB, [id, json, ttlSeconds], {
       prepare: true,
     });
   }
@@ -255,6 +260,20 @@ export class ScyllaRegistryStore implements RegistryPort {
    */
   async deletePersistedSubscription(id: cassandra.types.Uuid) {
     await this.client.execute(DELETE_PERSISTED_SUB, [id], { prepare: true });
+  }
+
+  /**
+   * Fetches a single persisted subscription by ID from ScyllaDB.
+   */
+  async getPersistedSubscription(
+    id: cassandra.types.Uuid,
+  ): Promise<{ id: cassandra.types.Uuid; json: string } | null> {
+    const res = await this.client.execute(SELECT_PERSISTED_SUB, [id], {
+      prepare: true,
+    });
+    const row = res.first();
+    if (!row) return null;
+    return { id: row.get("id"), json: row.get("json") };
   }
 
   /**

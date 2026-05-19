@@ -83,7 +83,7 @@ describe("InMemoryRegistryStore", () => {
   it("persists subscription round-trip", async () => {
     const store = new InMemoryRegistryStore();
     const sid = cassandra.types.Uuid.random();
-    await store.savePersistedSubscription(sid, '{"id":"x"}');
+    await store.savePersistedSubscription(sid, '{"id":"x"}', 86400);
     const list = await store.listPersistedSubscriptions();
     expect(list.some((r) => r.id.toString() === sid.toString())).toBe(true);
     await store.deletePersistedSubscription(sid);
