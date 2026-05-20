@@ -356,6 +356,8 @@ export const registrationRoutes: FastifyPluginAsync<{
     } catch {
       return sendError(reply, 400, "Invalid node id", null);
     }
+    const node = await store.getResource("nodes", id);
+    if (!node) return sendError(reply, 404, "Not found", null);
     const payload = (await req.body) as
       | Record<string, unknown>
       | string
