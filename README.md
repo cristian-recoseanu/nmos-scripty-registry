@@ -146,3 +146,43 @@ Wait until Scylla accepts CQL on `9042`, then start the registry.
 | `PERSISTED_SUBSCRIPTION_TTL_SECONDS` | `86400` (24h)        | TTL for `persisted_subscriptions` rows (refreshed periodically while sockets are connected)                                                                                                                 |
 | `HEARTBEAT_GC_INTERVAL_SECONDS` | `12`                      | Heartbeat garbage collection interval (IS-04 default)                                                                                                                                                         |
 | `LOG_LEVEL`                      | `info`                    | Logging level (e.g., `info`, `debug`, `warn`, `error`)                                                                                                                                                        |
+
+## Load Testing
+
+`load-test/scalability.js` is a plain Node.js scalability test — no external test framework required. Each node is simulated by an independent async task with its own `setInterval` timer that fires exactly `HEARTBEAT_INTERVAL_S` seconds after the node's registration completes, then every `HEARTBEAT_INTERVAL_S` seconds thereafter.
+
+### Requirements
+
+Node.js (uses built-in `fetch` and `crypto.randomUUID`). No `npm install` needed.
+
+### Running the test
+
+```bash
+node load-test/scalability.js
+```
+
+Override defaults with environment variables:
+
+```bash
+BASE_URL=http://127.0.0.1:8080 NODE_COUNT=10000 SPAWN_RATE=100 \
+  node load-test/scalability.js
+```
+
+### Parameters
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `BASE_URL` | `http://127.0.0.1:8080` | Target registry URL |
+| `NODE_COUNT` | `1000` | Total number of nodes to simulate |
+| `SPAWN_RATE` | `50` | Nodes spawned per second during ramp-up |
+| `HEARTBEAT_INTERVAL_S` | `5` | Seconds between heartbeats per node (IS-04 spec) |
+| `RUN_DURATION_S` | `120` | Seconds to sustain heartbeats after all nodes are registered |
+| `API_VERSION` | `v1.3` | NMOS Registration API version |
+
+### How it works
+
+- Each node is an independent async task: it registers once, then schedules a `setInterval` that fires exactly `HEARTBEAT_INTERVAL_S` seconds after registration
+- Nodes are spawned at `SPAWN_RATE`/s so heartbeats are naturally staggered across the population
+- A 404 heartbeat response triggers automatic re-registration
+- Stats are printed every 10 seconds showing registration and heartbeat counts and error rate
+- The process exits with code 1 if the heartbeat error rate exceeds 1%

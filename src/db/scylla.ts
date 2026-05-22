@@ -32,6 +32,13 @@ export async function connectScylla(config: RegistryConfig): Promise<Scylla> {
     localDataCenter: config.scylla.localDataCenter,
     protocolOptions: { port: 9042 },
     socketOptions: { connectTimeout: 10_000 },
+    pooling: {
+      coreConnectionsPerHost: {
+        [cassandra.types.distance.local]: 8,
+        [cassandra.types.distance.remote]: 2,
+      },
+      maxRequestsPerConnection: 2048,
+    },
     policies: {
       reconnection:
         new cassandra.policies.reconnection.ExponentialReconnectionPolicy(
