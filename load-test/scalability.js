@@ -173,10 +173,10 @@ const spawnHandle = setInterval(async () => {
     clearInterval(spawnHandle);
     const rampDone = new Date().toISOString();
     console.log(`[${rampDone}] All ${NODE_COUNT} nodes spawned. Running for ${RUN_DURATION_S}s...`);
-    const statsHandle = setInterval(() => printStats(new Date().toISOString()), 10_000);
-    setTimeout(() => {
-      clearInterval(statsHandle);
-      shutdown("DONE");
-    }, RUN_DURATION_S * 1000);
+    const quarterMs = RUN_DURATION_S * 1000 / 4;
+    setTimeout(() => printStats(new Date().toISOString() + " (25%)"), quarterMs);
+    setTimeout(() => printStats(new Date().toISOString() + " (50%)"), quarterMs * 2);
+    setTimeout(() => printStats(new Date().toISOString() + " (75%)"), quarterMs * 3);
+    setTimeout(() => shutdown("DONE"), RUN_DURATION_S * 1000);
   }
 }, spawnIntervalMs);

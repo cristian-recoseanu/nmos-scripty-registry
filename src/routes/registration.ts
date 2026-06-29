@@ -359,9 +359,7 @@ export const registrationRoutes: FastifyPluginAsync<{
     const node = await store.getResource("nodes", id);
     if (!node) return sendError(reply, 404, "Not found", null);
     const payload = (await req.body) as
-      | Record<string, unknown>
-      | string
-      | undefined;
+      Record<string, unknown> | string | undefined;
     const json =
       typeof payload === "string" ? payload : JSON.stringify(payload ?? {});
     await store.upsertHealth(id, json);
