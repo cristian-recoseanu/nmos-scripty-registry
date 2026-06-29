@@ -11,12 +11,7 @@ import type cassandra from "cassandra-driver";
  * All NMOS resource types in plural form.
  */
 export type ResourcePlural =
-  | "nodes"
-  | "devices"
-  | "sources"
-  | "flows"
-  | "senders"
-  | "receivers";
+  "nodes" | "devices" | "sources" | "flows" | "senders" | "receivers";
 
 /**
  * Types of change events in the change log.

@@ -49,8 +49,7 @@ function stripNodeV13TowardsV12(
 ): Record<string, unknown> {
   const out = structuredClone(obj) as Record<string, unknown>;
   const api = out.api as
-    | { endpoints?: Array<Record<string, unknown>> }
-    | undefined;
+    { endpoints?: Array<Record<string, unknown>> } | undefined;
   if (api?.endpoints) {
     for (const ep of api.endpoints) {
       delete ep.authorization;
