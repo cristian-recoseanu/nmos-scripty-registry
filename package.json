@@ -20,23 +20,23 @@
     "@fastify/websocket": "^11.0.2",
     "@types/winston": "^2.4.4",
     "cassandra-driver": "^4.9.0",
-    "fastify": "^5.9.0",
+    "fastify": "^5.10.0",
     "winston": "^3.19.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@types/node": "^26.0.1",
+    "@types/node": "^26.1.0",
     "@types/ws": "^8.18.0",
-    "@typescript-eslint/eslint-plugin": "^8.62.0",
-    "@typescript-eslint/parser": "^8.62.0",
+    "@typescript-eslint/eslint-plugin": "^8.62.1",
+    "@typescript-eslint/parser": "^8.62.1",
     "eslint": "^10.6.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.6",
     "globals": "^17.7.0",
-    "prettier": "^3.9.1",
-    "tsx": "^4.22.4",
+    "prettier": "^3.9.4",
+    "tsx": "^4.23.0",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.62.0",
-    "vitest": "^4.1.9"
+    "typescript-eslint": "^8.62.1",
+    "vitest": "^4.1.10"
   }
 }
