@@ -20,12 +20,12 @@
     "@fastify/websocket": "^11.3.0",
     "@types/winston": "^2.4.4",
     "cassandra-driver": "^4.9.0",
-    "fastify": "^5.10.0",
+    "fastify": "^5.11.0",
     "winston": "^3.19.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@types/node": "^26.1.1",
+    "@types/node": "^26.1.2",
     "@types/ws": "^8.18.0",
     "@typescript-eslint/eslint-plugin": "^8.65.0",
     "@typescript-eslint/parser": "^8.65.0",
