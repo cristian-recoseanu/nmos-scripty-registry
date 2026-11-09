@@ -16,11 +16,11 @@
     "node": ">=22"
   },
   "dependencies": {
-    "@fastify/cors": "^11.3.1",
-    "@fastify/websocket": "^11.3.4",
+    "@fastify/cors": "^11.4.1",
+    "@fastify/websocket": "^11.3.7",
     "@types/winston": "^2.4.4",
     "cassandra-driver": "^4.10.0",
-    "fastify": "^5.12.7",
+    "fastify": "^5.12.8",
     "winston": "^3.19.0"
   },
   "devDependencies": {
@@ -29,14 +29,14 @@
     "@types/ws": "^8.18.2",
     "@typescript-eslint/eslint-plugin": "^8.72.1",
     "@typescript-eslint/parser": "^8.72.1",
-    "eslint": "^10.13.0",
+    "eslint": "^10.14.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.7",
-    "globals": "^17.13.0",
+    "globals": "^17.14.0",
     "prettier": "^3.9.10",
     "tsx": "^4.23.15",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.72.1",
-    "vitest": "^5.0.5"
+    "vitest": "^5.1.0"
   }
 }
